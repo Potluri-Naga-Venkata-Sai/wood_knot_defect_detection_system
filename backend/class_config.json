@@ -1,0 +1,10 @@
+{
+    "class_names": [
+        "sound_knot",
+        "dead_knot",
+        "crack",
+        "pin_hole",
+        "rot_decay"
+    ],
+    "num_classes": 5
+}

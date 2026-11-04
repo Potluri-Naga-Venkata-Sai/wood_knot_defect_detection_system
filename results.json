@@ -1,0 +1,36 @@
+{
+    "project_name": "Automated Wood Timber Surface Knot and Decay Defect Sorting System",
+    "model": "MobileNetV3-Large",
+    "classes": [
+        "sound_knot",
+        "dead_knot",
+        "crack",
+        "pin_hole",
+        "rot_decay"
+    ],
+    "dataset": "iluvvatar/wood_surface_defects",
+    "total_images": 450,
+    "train_images": 314,
+    "validation_images": 68,
+    "test_images": 68,
+    "test_accuracy": 0.7205882352941176,
+    "macro_f1": 0.7205077531164488,
+    "weighted_f1": 0.7219541966984422,
+    "gpu_mean_latency_ms": 6.409181400008492,
+    "gpu_p95_latency_ms": 9.510172800173676,
+    "gpu_fps": 156.0261658374461,
+    "cpu_mean_latency_ms": 26.646262594982772,
+    "cpu_p95_latency_ms": 35.696247800046876,
+    "cpu_fps": 37.52871519731589,
+    "model_size_mb": 16.250741004943848,
+    "best_validation_accuracy": 0.7352941176470589,
+    "class_distribution": {
+        "sound_knot": 90,
+        "dead_knot": 90,
+        "crack": 90,
+        "pin_hole": 90,
+        "rot_decay": 90
+    },
+    "sorting_simulation_boards": 68,
+    "sorting_simulation_throughput": 67.87160369009705
+}

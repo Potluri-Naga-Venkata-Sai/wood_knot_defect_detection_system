@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Automated Wood Timber Defect Sorting System</title>
+  <meta name="description" content="Deep learning timber surface knot and decay defect inspection system powered by MobileNetV3-Large and FastAPI.">
+  
+  <!-- Modern Typography (Outfit & Plus Jakarta Sans) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Chart.js for Probability Distribution Visualization -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Top Background Ambient Glow -->
+  <div class="ambient-glow" aria-hidden="true"></div>
+
+  <div class="app-container">
+    <!-- ========================================== -->
+    <!-- SECTION A: HEADER & STATUS BAR            -->
+    <!-- ========================================== -->
+    <header class="app-header" id="appHeader">
+      <div class="header-brand">
+        <div class="brand-icon-wrapper">
+          <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            <circle cx="12" cy="11" r="3"></circle>
+            <path d="M12 8v-2"></path>
+            <path d="M12 16v-2"></path>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <div class="brand-tag">Industrial Vision AI • Timber Quality Control</div>
+          <h1 class="brand-title">Automated Wood Timber Surface Knot &amp; Decay Defect Sorting System</h1>
+          <p class="brand-subtitle">
+            Automated visual sorting &amp; quality classification powered by deep neural networks (MobileNetV3-Large).
+            Classifies timber surface defects across 5 industrial inspection categories.
+          </p>
+        </div>
+      </div>
+
+      <!-- Live Backend Connection Status -->
+      <div class="status-panel">
+        <div class="status-badge" id="backendStatusBadge" title="Click to refresh connection status">
+          <span class="status-pulse" id="statusPulse"></span>
+          <span class="status-text" id="statusText">Checking Backend...</span>
+        </div>
+        <button type="button" class="btn-refresh" id="btnRefreshStatus" title="Reconnect to Backend API">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+          </svg>
+          Check API
+        </button>
+      </div>
+    </header>
+
+    <!-- Model Spec Pill Bar -->
+    <div class="spec-bar">
+      <div class="spec-pill">
+        <span class="spec-label">Model:</span>
+        <span class="spec-value" id="specModel">MobileNetV3-Large</span>
+      </div>
+      <div class="spec-pill">
+        <span class="spec-label">Input Size:</span>
+        <span class="spec-value">224 × 224 RGB</span>
+      </div>
+      <div class="spec-pill">
+        <span class="spec-label">Inference Engine:</span>
+        <span class="spec-value" id="specDevice">PyTorch (CPU)</span>
+      </div>
+      <div class="spec-pill">
+        <span class="spec-label">Defect Classes:</span>
+        <span class="spec-value">5 Registered Categories</span>
+      </div>
+    </div>
+
+    <!-- Offline Alert Notice (Shown if backend isn't running) -->
+    <div class="offline-banner" id="offlineBanner" style="display: none;">
+      <div class="banner-content">
+        <div class="banner-icon">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+        </div>
+        <div class="banner-message">
+          <strong>FastAPI Backend is not reachable at <code id="apiBaseUrlDisplay">http://127.0.0.1:8000</code>.</strong>
+          <span>Please run <code>uvicorn backend.main:app --reload --port 8000</code> in your terminal to enable real-time inference.</span>
+        </div>
+      </div>
+      <button type="button" class="btn-banner-retry" id="btnBannerRetry">Retry Connection</button>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MAIN INTERACTIVE WORKSPACE                 -->
+    <!-- ========================================== -->
+    <main class="dashboard-grid">
+      
+      <!-- LEFT COLUMN: Image Upload & Previews -->
+      <section class="card upload-card" id="uploadSection">
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="card-step-badge">1</span>
+            <div>
+              <h2 class="card-title">Timber Surface Image</h2>
+              <p class="card-desc">Upload a timber surface photo or choose a benchmark sample</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <!-- Drag and Drop Zone -->
+          <div class="dropzone" id="dropZone" tabindex="0" role="button" aria-label="Upload wood timber image">
+            <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp,image/jpg" class="file-input-hidden">
+            
+            <!-- Default Empty Dropzone View -->
+            <div class="dropzone-empty" id="dropzoneEmpty">
+              <div class="upload-icon-container">
+                <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+              </div>
+              <h3 class="dropzone-title">Drag &amp; drop timber image here</h3>
+              <p class="dropzone-sub">Supports JPEG, PNG, WebP up to 15MB</p>
+              <button type="button" class="btn btn-secondary" id="btnBrowse">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                Browse Image
+              </button>
+            </div>
+
+            <!-- Preview View (Populated when image is selected) -->
+            <div class="dropzone-preview" id="dropzonePreview" style="display: none;">
+              <div class="preview-frame">
+                <img id="previewImage" src="" alt="Timber Surface Preview" class="preview-img">
+                <div class="scan-overlay" id="scanOverlay">
+                  <div class="scan-laser"></div>
+                </div>
+              </div>
+              <div class="preview-meta">
+                <div class="meta-row">
+                  <span class="meta-filename" id="previewFilename">timber_image.jpg</span>
+                  <span class="meta-filesize" id="previewFilesize">-- KB</span>
+                </div>
+                <div class="meta-badges">
+                  <span class="badge-subtle" id="previewDimensions">-- × -- px</span>
+                  <span class="badge-subtle badge-success">Ready for Inference</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Upload Actions Bar -->
+          <div class="upload-actions" id="uploadActions" style="display: none;">
+            <button type="button" class="btn btn-outline" id="btnResetImage">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+              Remove Image
+            </button>
+            <button type="button" class="btn btn-primary btn-predict" id="btnPredict">
+              <svg class="btn-predict-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+              <span>Predict Defect</span>
+            </button>
+          </div>
+
+          <!-- Quick Test Benchmark Samples -->
+          <div class="sample-picker">
+            <div class="sample-picker-title">
+              <span>Quick Test Samples:</span>
+              <small>Click to load pre-verified timber test surfaces</small>
+            </div>
+            <div class="sample-grid">
+              <button type="button" class="sample-card" data-sample="sample_sound_knot.jpg" data-name="Sound Knot" title="Load genuine Sound Knot timber surface">
+                <img src="samples/sample_sound_knot.jpg" alt="Sound Knot sample">
+                <span class="sample-label">Sound Knot</span>
+              </button>
+              <button type="button" class="sample-card" data-sample="sample_dead_knot.jpg" data-name="Dead Knot" title="Load genuine Dead Knot timber surface">
+                <img src="samples/sample_dead_knot.jpg" alt="Dead Knot sample">
+                <span class="sample-label">Dead Knot</span>
+              </button>
+              <button type="button" class="sample-card" data-sample="sample_crack.jpg" data-name="Crack" title="Load genuine Crack timber surface">
+                <img src="samples/sample_crack.jpg" alt="Crack sample">
+                <span class="sample-label">Crack</span>
+              </button>
+              <button type="button" class="sample-card" data-sample="sample_pin_hole.jpg" data-name="Pin Hole" title="Load genuine Pin Hole timber surface">
+                <img src="samples/sample_pin_hole.jpg" alt="Pin Hole sample">
+                <span class="sample-label">Pin Hole</span>
+              </button>
+              <button type="button" class="sample-card" data-sample="sample_rot_decay.jpg" data-name="Rot / Decay" title="Load genuine Rot / Decay timber surface">
+                <img src="samples/sample_rot_decay.jpg" alt="Rot / Decay sample">
+                <span class="sample-label">Rot / Decay</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT COLUMN: Prediction & Result Section -->
+      <section class="card results-card" id="resultsSection">
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="card-step-badge">2</span>
+            <div>
+              <h2 class="card-title">Inspection Analysis &amp; Results</h2>
+              <p class="card-desc">Real-time classification from trained MobileNetV3-Large</p>
+            </div>
+          </div>
+          <div class="inference-timer" id="inferenceTimer" style="display: none;">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <span id="inferenceTimeValue">-- ms</span>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <!-- State 1: Standby State (No image selected yet) -->
+          <div class="state-container state-standby" id="stateStandby">
+            <div class="standby-illustration">
+              <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+                <circle cx="8" cy="9" r="2"></circle>
+                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
+              </svg>
+            </div>
+            <h3 class="standby-title">Awaiting Timber Image</h3>
+            <p class="standby-text">
+              Select or drag an image on the left, then click <strong>"Predict Defect"</strong> to perform deep learning sorting.
+            </p>
+          </div>
+
+          <!-- State 2: Loading / Inference in Progress -->
+          <div class="state-container state-loading" id="stateLoading" style="display: none;">
+            <div class="spinner-wrapper">
+              <div class="wood-spinner"></div>
+            </div>
+            <h3 class="loading-title">Analyzing Timber Surface...</h3>
+            <p class="loading-text">Extracting visual features and calculating class probabilities through MobileNetV3-Large.</p>
+            <div class="progress-bar-container">
+              <div class="progress-bar-indeterminate"></div>
+            </div>
+          </div>
+
+          <!-- State 3: Active Results & Predictions -->
+          <div class="state-container state-active" id="stateActive" style="display: none;">
+            
+            <!-- Result Highlight Card -->
+            <div class="result-highlight-card" id="resultHighlightCard">
+              <div class="result-highlight-header">
+                <div>
+                  <span class="result-pretitle">Primary Detected Defect</span>
+                  <h3 class="result-defect-name" id="resultDefectName">Sound Knot</h3>
+                </div>
+                <div class="confidence-circle" id="confidenceCircle">
+                  <span class="confidence-val" id="resultConfidenceVal">0.0%</span>
+                  <span class="confidence-sub">Confidence</span>
+                </div>
+              </div>
+
+              <!-- Confidence Progress Bar -->
+              <div class="confidence-meter-container">
+                <div class="meter-labels">
+                  <span>Confidence Level</span>
+                  <strong id="confidenceLabelGrade">High Confidence</strong>
+                </div>
+                <div class="meter-track">
+                  <div class="meter-fill" id="confidenceMeterFill" style="width: 0%;"></div>
+                </div>
+              </div>
+
+              <!-- Defect Assessment Details Grid -->
+              <div class="defect-details-grid">
+                <div class="detail-box">
+                  <span class="detail-label">Severity Level</span>
+                  <span class="detail-value severity-badge" id="resultSeverity">--</span>
+                </div>
+                <div class="detail-box">
+                  <span class="detail-label">Industrial Grading</span>
+                  <span class="detail-value" id="resultRecommendation">--</span>
+                </div>
+              </div>
+
+              <!-- Defect Physical Description -->
+              <div class="defect-description-box">
+                <span class="desc-heading">Defect Characteristics</span>
+                <p id="resultDescription" class="desc-content">--</p>
+              </div>
+            </div>
+
+            <!-- Probability Distribution Chart (Chart.js) -->
+            <div class="chart-container-card">
+              <div class="chart-header">
+                <h4 class="chart-title">Five-Class Probability Distribution</h4>
+                <span class="chart-badge">Softmax Normalized</span>
+              </div>
+              <div class="chart-wrapper">
+                <canvas id="defectProbabilityChart"></canvas>
+              </div>
+            </div>
+
+            <!-- Bottom Action: Test Another Image -->
+            <div class="results-actions">
+              <button type="button" class="btn btn-outline btn-full" id="btnTestAnother">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                  <polyline points="9 11 12 14 22 4"></polyline>
+                </svg>
+                Upload Another Timber Surface
+              </button>
+            </div>
+          </div>
+
+          <!-- State 4: Error State -->
+          <div class="state-container state-error" id="stateError" style="display: none;">
+            <div class="error-icon">
+              <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="15" y1="9" x2="9" y2="15"></line>
+                <line x1="9" y1="9" x2="15" y2="15"></line>
+              </svg>
+            </div>
+            <h3 class="error-title">Inference Request Failed</h3>
+            <p class="error-text" id="errorMessage">Unable to process the image with the neural network.</p>
+            <button type="button" class="btn btn-secondary" id="btnErrorRetry">Try Again</button>
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ========================================== -->
+    <!-- DEFECT REFERENCE ENCYCLOPEDIA / GUIDE      -->
+    <!-- ========================================== -->
+    <section class="reference-section">
+      <div class="reference-header">
+        <h3 class="reference-title">Wood Surface Defect Reference Library</h3>
+        <p class="reference-desc">Standardized taxonomy &amp; quality sorting criteria recognized by the model</p>
+      </div>
+      <div class="reference-grid">
+        <div class="ref-card" style="border-top-color: #388e3c;">
+          <div class="ref-badge green-badge">Sound Knot</div>
+          <h4>Living Branch Junction</h4>
+          <p>An intergrown knot formed by living branches, firmly cemented into the timber body. Retains strong fiber continuity.</p>
+          <div class="ref-grade">Industry Grade: Acceptable for structural framing</div>
+        </div>
+        <div class="ref-card" style="border-top-color: #d97706;">
+          <div class="ref-badge amber-badge">Dead Knot</div>
+          <h4>Encased / Loose Knot</h4>
+          <p>Formed from a dead limb; ringed with black bark or voids. Prone to loosening, drying fallout, and high stress notches.</p>
+          <div class="ref-grade">Industry Grade: Requires resin stabilization or trim</div>
+        </div>
+        <div class="ref-card" style="border-top-color: #dc2626;">
+          <div class="ref-badge red-badge">Crack / Split</div>
+          <h4>Separation of Fibers</h4>
+          <p>Longitudinal rupture along radial wood rays from uneven moisture release or tension during kiln seasoning.</p>
+          <div class="ref-grade">Industry Grade: Reject for structural load-bearing</div>
+        </div>
+        <div class="ref-card" style="border-top-color: #0284c7;">
+          <div class="ref-badge blue-badge">Pin Hole</div>
+          <h4>Insect Boreholes (&lt; 2mm)</h4>
+          <p>Fine perforations bored by ambrosia beetles in unseasoned green wood. Minor structural defect unless infestation is active.</p>
+          <div class="ref-grade">Industry Grade: Verify insect inactivity; kiln heat-treat</div>
+        </div>
+        <div class="ref-card" style="border-top-color: #7c2d12;">
+          <div class="ref-badge dark-badge">Rot / Decay</div>
+          <h4>Fungal Decomposition</h4>
+          <p>Enzymatic breakdown of timber lignin and cellulose. Results in spongy or brittle cubical fracture and total strength loss.</p>
+          <div class="ref-grade">Industry Grade: Immediate Cull / Industrial Discard</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- FOOTER                                     -->
+    <!-- ========================================== -->
+    <footer class="app-footer">
+      <div class="footer-content">
+        <p><strong>Automated Wood Timber Surface Knot &amp; Decay Defect Sorting System</strong></p>
+        <p class="footer-sub">Engineered with PyTorch • MobileNetV3-Large • FastAPI • Chart.js</p>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Main Application Logic -->
+  <script src="script.js"></script>
+</body>
+</html>
